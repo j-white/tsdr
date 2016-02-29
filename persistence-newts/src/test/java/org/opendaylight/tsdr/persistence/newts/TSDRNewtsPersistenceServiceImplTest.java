@@ -9,70 +9,62 @@ package org.opendaylight.tsdr.persistence.newts;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.cassandraunit.dataset.CQLDataSet;
-import org.cassandraunit.dataset.cql.FileCQLDataSet;
-import org.junit.Before;
 import org.junit.Test;
-import org.opendaylight.tsdr.spi.util.FormatUtil;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecordBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.tsdrrecord.RecordKeys;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.tsdrrecord.RecordKeysBuilder;
-import org.opennms.newts.cassandra.AbstractCassandraTestCase;
-import org.opennms.newts.cassandra.Schema;
-
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
-import com.google.common.io.CharStreams;
-import com.google.common.io.Files;
+import org.opennms.newts.api.MetricType;
+import org.opennms.newts.api.Sample;
 
 /**
- * FIXME: This should be an integration test.
- *
  * @author Jesse White (jesse@opennms.org)
  **/
-public class TSDRNewtsPersistenceServiceImplTest extends AbstractCassandraTestCase {
-    public static final int CASSANDRA_TTL = 86400;
+public class TSDRNewtsPersistenceServiceImplTest {
 
-    private TSDRNewtsPersistenceServiceImpl impl;
+    private TSDRNewtsPersistenceServiceImpl impl = new TSDRNewtsPersistenceServiceImpl(new NewtsConfig(), false);
 
-    @Before
-    public void setUp() throws Exception {
-        // Hack for libsigar-amd64-linux-1.6.4.so
-        System.setProperty("java.library.path", "/home/jesse/Downloads/out");
-        super.setUp();
-        impl = new TSDRNewtsPersistenceServiceImpl(CASSANDRA_KEYSPACE, CASSANDRA_HOST, CASSANDRA_PORT);
+    @Test
+    public void testGetNewtsResourceId() {
+        TSDRMetricRecord m = createMetricRecord();
+        assertEquals("test_1:EXTERNAL:_1", impl.getNewtsResourceId(m));
     }
 
     @Test
-    public void canStoreAndGetMetrics() throws InterruptedException {
-        // Create a new record
-        Long now = System.currentTimeMillis();
-        TSDRMetricRecord metricRecord = createMetricRecord(now);
+    public void testGetMetricType() {
+        checkType(DataCategory.FLOWTABLESTATS, "ActiveFlows", MetricType.GAUGE);
+        checkType(DataCategory.FLOWTABLESTATS, "PacketLookup", MetricType.COUNTER);
+        checkType(DataCategory.FLOWTABLESTATS, "PacketMatch", MetricType.COUNTER);
+        checkType(DataCategory.PORTSTATS, "*", MetricType.COUNTER);
+        checkType(DataCategory.FLOWSTATS, "*", MetricType.COUNTER);
 
-        // Verify that there are no existing records
-        String metricKey = FormatUtil.getTSDRMetricKey(metricRecord);
-        assertEquals(0, impl.getTSDRMetricRecords(metricKey, now - 1000, now + 1000).size());
+        // Should default to GAUGE for unknown types
+        checkType(DataCategory.SYSLOG, "", MetricType.GAUGE);
+    }
 
-        // Store the record
-        impl.store(metricRecord);
+    private void checkType(DataCategory cat, String metric, MetricType type) {
+        assertEquals(type, impl.getMetricType(cat, metric));
+    }
 
-        // TODO: Use awaitility
-        // Wait for the samples to flush
-        Thread.sleep(10000);
+    @Test
+    public void canConvertToAndFromSample() {
+        // Create a metric record
+        TSDRMetricRecord m = createMetricRecord();
+        // Convert it to a sample
+        Sample s = impl.toSample(m);
+        // Convert the sample back to a record
+        TSDRMetricRecord mm = impl.toMetricRecord(s.getResource(), s);
+        // Verify
+        assertEquals(m, mm);
+    }
 
-        // Retrieve the record and compare it to the original record
-        List<TSDRMetricRecord> metricRecords = impl.getTSDRMetricRecords(metricKey, now - 1000, now + 1000);
-        assertEquals(Lists.newArrayList(metricRecord), metricRecords);
+    public static TSDRMetricRecord createMetricRecord() {
+        return createMetricRecord(System.currentTimeMillis());
     }
 
     public static TSDRMetricRecord createMetricRecord(Long timeStamp){
@@ -89,60 +81,5 @@ public class TSDRNewtsPersistenceServiceImplTest extends AbstractCassandraTestCa
         recs.add(rb.build());
         b.setRecordKeys(recs);
         return b.build();
-    }
-
-    @Override
-    protected String getSchemaResource() {
-        throw new IllegalStateException();
-    }
-
-    @Override
-    public CQLDataSet getDataSet() {
-        try {
-            final Schema searchSchema = new org.opennms.newts.cassandra.search.Schema();
-            final Schema samplesSchema = new org.opennms.newts.persistence.cassandra.Schema();
-            final List<Schema> schemas = Lists.newArrayList(searchSchema, samplesSchema);
-
-            //  Concatenate the schema strings
-            String schemasString = "";
-            for (Schema schema : schemas) {
-                schemasString += CharStreams.toString(new InputStreamReader(schema.getInputStream()));
-            }
-
-            // Replace the placeholders
-            schemasString = schemasString.replace(KEYSPACE_PLACEHOLDER, CASSANDRA_KEYSPACE);
-
-            // Split the resulting script back into lines
-            String lines[] = schemasString.split("\\r?\\n");
-
-            // Remove duplicate CREATE KEYSPACE statements;
-            StringBuffer sb = new StringBuffer();
-            boolean foundCreateKeyspace = false;
-            boolean skipNextLine = false;
-            for (String line : lines) {
-                if (line.startsWith("CREATE KEYSPACE")) {
-                    if (!foundCreateKeyspace) {
-                        foundCreateKeyspace = true;
-                        sb.append(line);
-                        sb.append("\n");
-                    } else {
-                        skipNextLine = true;
-                    }
-                } else if (skipNextLine) {
-                    skipNextLine = false;
-                } else {
-                    sb.append(line);
-                    sb.append("\n");
-                }
-            }
-
-            // Write the results to disk
-            File schemaFile = File.createTempFile("schema-", ".cql", new File("target"));
-            schemaFile.deleteOnExit();
-            Files.write(sb.toString(), schemaFile, Charsets.UTF_8);
-            return new FileCQLDataSet(schemaFile.getAbsolutePath(), false, true, CASSANDRA_KEYSPACE);
-        } catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
     }
 }

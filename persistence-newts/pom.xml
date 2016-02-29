@@ -76,6 +76,12 @@
         <artifactId>mockito-all</artifactId>
     </dependency>
     <dependency>
+        <groupId>com.jayway.awaitility</groupId>
+        <artifactId>awaitility</artifactId>
+        <version>1.6.3</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-simple</artifactId>
         <scope>test</scope>

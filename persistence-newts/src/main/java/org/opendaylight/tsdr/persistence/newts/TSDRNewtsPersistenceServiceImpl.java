@@ -66,222 +66,95 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
+ * TSDR Persistence Strategy for Newts
+ *
+ * The current implementation of the strategy stores samples
+ * the same way that OpenNMS does, so we can take advantage
+ * of the graphing tools available there.
+ *
+ * In particular, OpenNMS stores samples in resources named like:
+ *   snmp:fs:NODES:ny-cassandra-1:dskIndex:dev-shm:net-snmp-disk
+ *
+ * A sample TSDRMetricRecord object looks like:
+ *   nodeId[openflow:7]
+ *   dataCategory[FLOWTABLESTATS],
+ *   metricName[PacketLookup]
+ *   metricValue=[0]
+ *   timestamp[1456416295101],
+ *   recordKeys[Node=openflow:7,Table=122]
+ *
+ * So, we use the following format for resource IDs:
+ *   ${prefix}${nodeId}:${dataCategory}:${dataCategorySpecificIndex}${suffix}
+ *
+ * where prefix = "snmp:fs:NODES:" and suffix = ":stats"
+ *
+ * Current issues include:
+ *
+ * A) Need to differentiate between counters and gauges - see getMetricType()
+ *
+ *     Possible workaround: Store everything as Gauges and calculate the rates on demand.
+ *
+ * B) Need to add a category specific index - see getResourceIndex()
+ *
+ *     Possible workaround: Add support for driving the resource id calculation using a script
+ *     Possible workaround: Add all of the record keys, and use a regular expression in the
+ *                          resource type to parse them
+ * !!Possible workaround!!: Add the record keys as "string attributes" and reference
+ *                          those in the resource labels i.e. resourceLabel="${diskIODevice}"
+ * C) We don't support storing log data
+ *
  * @author Jesse White (jesse@opennms.org)
  **/
 public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
     private static final Logger LOG = LoggerFactory.getLogger(TSDRNewtsPersistenceServiceImpl.class);
 
-    // TODO: Make this configurable
-    private static final String RESOURCE_PREFIX = "snmp:fs:NODES:";
-    private static final String RESOURCE_SUFFIX = ":stats";
-    private static final Context context = Context.DEFAULT_CONTEXT;
-    private final String keyspace;
-    private final String host;
-    private final int port;
-
     private static final EscapableResourceIdSplitter splitter = new EscapableResourceIdSplitter();
+
+    private final NewtsConfig newtsConfig;
+
     private CassandraSearcher searcher;
     private CassandraSampleRepository sampleRepository;
     private CassandraSession session;
 
     public TSDRNewtsPersistenceServiceImpl() {
-        String envHost = System.getenv("NEWTS_HOST");
-        String envPort = System.getenv("NEWTS_PORT");
-        if (envHost != null) {
-            this.host = envHost;
-        } else {
-            this.host = "127.0.0.1";
-        }
-
-        if (envPort != null) {
-            this.port = Integer.valueOf(envPort);
-        } else {
-            this.port = 9042;
-        }
-
-        this.keyspace = "newts";
-        register();
+        this(new NewtsConfig());
     }
 
-    public TSDRNewtsPersistenceServiceImpl(String keyspace, String host, int port) {
-        this.keyspace = Objects.requireNonNull(keyspace, "keyspace");
-        this.host = Objects.requireNonNull(host, "localhost");
-        this.port = port;
-        register();
+    public TSDRNewtsPersistenceServiceImpl(NewtsConfig newtsConfig) {
+        this(newtsConfig, true);
     }
 
-    private void register() {
+    public TSDRNewtsPersistenceServiceImpl(NewtsConfig newtsConfig, boolean autoRegister) {
+        this.newtsConfig = Objects.requireNonNull(newtsConfig);
+        if (autoRegister) {
+            register();
+        }
+    }
+
+    public void register() {
         TsdrPersistenceServiceUtil.setTsdrPersistenceService(this);
         LOG.info("Initialized Newts store with keyspace={}, host={} and port={}.",
-                keyspace, host, port);
-    }
-
-    /*
-     * Extends the attribute map with indices used by the {@link org.opennms.netmgt.dao.support.NewtsResourceStorageDao}.
-     *
-     * A resource path of the form [a, b, c, d] will be indexed with:
-     * <ul>
-     * <li> _idx1: (a, 4)
-     * <li> _idx2: (a:b, 4)
-     * <li> _idx3: (a:b:c, 4)
-     */
-    public static void addIndicesToAttributes(String resourceId, Map<String, String> attributes) {
-        final List<String> els = splitter.splitIdIntoElements(resourceId);
-        final int N = els.size();
-        for (int i = 0; i < N; i++) {
-            final String id = splitter.joinElementsToId(els.subList(0, i+1));
-            attributes.put("_idx" + i, String.format("(%s,%d)", id, N));
-        }
-    }
-
-    protected static String getResourceIndex(DataCategory dataCategory, List<RecordKeys> recordKeys) {
-        Map<String, String> indexedRecordKeys = Maps.newHashMap();
-        for (RecordKey recordKey : recordKeys) {
-            indexedRecordKeys.put(recordKey.getKeyName(), recordKey.getKeyValue());
-        }
-
-        switch (dataCategory) {
-        case FLOWSTATS:
-            return String.format("%s_%s", indexedRecordKeys.get("Table"), indexedRecordKeys.get("Flow"));
-        case FLOWTABLESTATS:
-            return indexedRecordKeys.get("Table");
-        case PORTSTATS:
-            return indexedRecordKeys.get("NodeConnector");       
-        default:
-            LOG.warn("Unsupported data category {} with record keys: {}", dataCategory, recordKeys);
-            return "_1";
-        }
-    }
-
-    @VisibleForTesting
-    protected static String getNewtsResourceId(TSDRMetricRecord m) {
-        List<String> pathElements = Lists.newArrayList();
-        pathElements.add(m.getNodeID().replace(":", "_")); // OpenNMS chokes on ':'
-        pathElements.add(m.getTSDRDataCategory().toString());
-        pathElements.add(getResourceIndex(m.getTSDRDataCategory(), m.getRecordKeys()));
-
-        return RESOURCE_PREFIX + splitter.joinElementsToId(pathElements) + RESOURCE_SUFFIX;
-    }
-
-    @VisibleForTesting
-    @SuppressWarnings("incomplete-switch")
-    protected static MetricType getMetricType(DataCategory dataCategory, String metricName) {
-        switch (dataCategory) {
-        case FLOWSTATS:
-            return MetricType.COUNTER;
-        case FLOWTABLESTATS:
-            switch (metricName) {
-            case "ActiveFlows": return MetricType.GAUGE;
-            case "PacketLookup": return MetricType.COUNTER;
-            case "PacketMatch": return MetricType.COUNTER;
-            }
-        case PORTSTATS:
-            return MetricType.COUNTER;
-        }
-        return MetricType.GAUGE;
-    }
-
-    /*
-     * 
-     * OpenNMS stores samples in resources named like:
-     *   snmp:fs:NODES:ny-cassandra-1:dskIndex:dev-shm:net-snmp-disk
-     *
-     * Sample TSDRMetricRecord object:
-     *   nodeId[openflow:7]
-     *   dataCategory[FLOWTABLESTATS],
-     *   metricName[PacketLookup]
-     *   metricValue=[0]
-     *   timestamp[1456416295101],
-     *   recordKeys[Node=openflow:7,Table=122]
-     *
-     * Resource ID format:
-     *   ${prefix}${nodeId}:${dataCategory}:${dataCategorySpecificIndex}${suffix}
-     *
-     * Where:
-     *    prefix = "snmp:fs:NODES:"
-     *
-     */
-    @VisibleForTesting
-    protected static Sample toSample(TSDRMetricRecord m) {
-        // Calculate the Newts Resource ID
-        String resourceId = getNewtsResourceId(m);
-
-        // Determine the metric type
-        MetricType metricType = getMetricType(m.getTSDRDataCategory(), m.getMetricName());
-
-        // Add the metric key as a resource attribute
-        Map<String, String> attributes = Maps.newHashMap();
-        attributes.put("metricKey", FormatUtil.getTSDRMetricKey(m));
-        // Add additional indices used by OpenNMS
-        addIndicesToAttributes(resourceId, attributes);
-
-        // Create the resource and sample
-        Resource resource = new Resource(resourceId, Optional.of(attributes));
-        return new Sample(
-                Timestamp.fromEpochMillis(m.getTimeStamp()),
-                context,
-                resource,
-                m.getMetricName(),
-                metricType,
-                ValueType.compose(m.getMetricValue(), metricType));
-    }
-
-    @VisibleForTesting
-    protected static TSDRMetricRecord toMetricRecord(Resource r, Sample s) {
-        Map<String, String> attributes = r.getAttributes().or(new HashMap<String, String>(0));
-        String metricKey = attributes.get("metricKey");
-        TSDRMetricRecordBuilder b = new TSDRMetricRecordBuilder();
-        b.setNodeID(FormatUtil.getNodeIdFromTSDRKey(metricKey));
-        b.setTimeStamp(s.getTimestamp().asMillis());
-        b.setMetricName(s.getName());
-        b.setMetricValue(new BigDecimal(s.getValue().doubleValue()));
-        b.setTSDRDataCategory(DataCategory.valueOf(FormatUtil.getDataCategoryFromTSDRKey(metricKey)));
-        b.setRecordKeys(FormatUtil.getRecordKeysFromTSDRKey(metricKey));
-        return b.build();
-    }
-
-    @Override
-    public void store(TSDRMetricRecord m) {
-        sampleRepository.insert(Collections.singleton(toSample(m)));
-    }
-
-    @Override
-    public void store(TSDRLogRecord m) {
-        // Persisting log records is not currently supported by Newts, silently ignore these requests
-    }
-
-    @Override
-    public void store(List<TSDRRecord> metricRecordList) {
-        List<Sample> samples = Lists.newArrayList();
-        for (TSDRRecord record : metricRecordList) {
-            if (record instanceof TSDRMetricRecord) {
-                samples.add(toSample((TSDRMetricRecord)record));
-                store((TSDRMetricRecord)record);
-            }
-            // Silently ignore other types of records
-         }
-        sampleRepository.insert(samples);
+                newtsConfig.getKeyspace(), newtsConfig.getHost(), newtsConfig.getPort());
     }
 
     @Override
     public void start(int timeout) {
         MetricRegistry registry = new MetricRegistry();
         ContextConfigurations contextConfigurations = new ContextConfigurations();
-
         CassandraSession session = new CassandraSession(
-                keyspace,
-                host,
-                port,
-                "NONE",
-                "admin",
-                "admin");
-        ResourceMetadataCache cache = new GuavaResourceMetadataCache(8096, registry);
+                newtsConfig.getKeyspace(),
+                newtsConfig.getHost(),
+                newtsConfig.getPort(),
+                newtsConfig.getCompression(),
+                newtsConfig.getUser(),
+                newtsConfig.getPassword());
+        ResourceMetadataCache cache = new GuavaResourceMetadataCache(newtsConfig.getCacheSize(), registry);
         CassandraIndexer indexer = new CassandraIndexer(
                 session,
-                86400,
+                newtsConfig.getTTL(),
                 cache,
                 registry,
-                false,
+                newtsConfig.isHierarchicalIndexingEnabled(),
                 new EscapableResourceIdSplitter(),
                 contextConfigurations);
         searcher = new CassandraSearcher(session, registry, contextConfigurations);
@@ -289,7 +162,7 @@ public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
         SampleProcessorService sampleProcessorService = new SampleProcessorService(4, Sets.newHashSet(indexerProcessor));
         sampleRepository = new CassandraSampleRepository(
                 session,
-                7*24*60*60*1000,
+                newtsConfig.getTTL(),
                 registry,
                 sampleProcessorService,
                 contextConfigurations);
@@ -308,16 +181,30 @@ public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
     }
 
     @Override
-    public void purgeTSDRRecords(DataCategory category, Long retentionTime){
-        LOG.info("Purging records with category {} earlier than {}.", category.name(), new Date(retentionTime));
+    public void store(TSDRMetricRecord m) {
+        store(Collections.singletonList((TSDRRecord)m));
     }
 
     @Override
-    public void purgeAllTSDRRecords(Long retentionTime) {
-        for (DataCategory dataCategory : DataCategory.values()) {
-            purgeTSDRRecords(dataCategory, retentionTime);
-        }
+    public void store(TSDRLogRecord m) {
+        store(Collections.singletonList((TSDRRecord)m));
     }
+
+    @Override
+    public void store(List<TSDRRecord> metricRecordList) {
+        List<Sample> samples = Lists.newArrayList();
+        for (TSDRRecord record : metricRecordList) {
+            if (record instanceof TSDRMetricRecord) {
+                samples.add(toSample((TSDRMetricRecord)record));
+            } else if (record instanceof TSDRLogRecord) {
+                LOG.warn("Newts cannot store log records.");
+            } else {
+                LOG.error("Unknown record type {} will not be stored.", record.getClass());
+            }
+         }
+        sampleRepository.insert(samples);
+    }
+
 
     @Override
     public List<TSDRMetricRecord> getTSDRMetricRecords(String tsdrMetricKey, long startTime, long endTime) {
@@ -329,7 +216,7 @@ public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
         q.add(tq, Operator.OR);
 
         Set<Resource> resources = Sets.newHashSet();
-        SearchResults searchResults = searcher.search(context, q, true);
+        SearchResults searchResults = searcher.search(newtsConfig.getContext(), q, true);
         for (Result searchResult : searchResults) {
             resources.add(searchResult.getResource());
         }
@@ -358,5 +245,124 @@ public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
     @Override
     public List<TSDRLogRecord> getTSDRLogRecords(String tsdrMetricKey, long startTime, long endTime) {
         return Collections.emptyList();
+    }
+
+    @Override
+    public void purgeTSDRRecords(DataCategory category, Long retentionTime) {
+        LOG.info("Purging records with category {} earlier than {}.", category.name(), new Date(retentionTime));
+        // TODO: Search for category, and delete
+    }
+
+    @Override
+    public void purgeAllTSDRRecords(Long retentionTime) {
+        for (DataCategory dataCategory : DataCategory.values()) {
+            purgeTSDRRecords(dataCategory, retentionTime);
+        }
+    }
+
+    @VisibleForTesting
+    protected Sample toSample(TSDRMetricRecord m) {
+        // Calculate the Newts Resource ID
+        String resourceId = getNewtsResourceId(m);
+
+        // Determine the metric type
+        MetricType metricType = getMetricType(m.getTSDRDataCategory(), m.getMetricName());
+
+        // Add the metric key as a resource attribute
+        Map<String, String> attributes = Maps.newHashMap();
+        attributes.put("metricKey", FormatUtil.getTSDRMetricKey(m));
+        if (newtsConfig.isOpenNMSIndexingEnabled()) {
+            // Add additional indices used by OpenNMS
+            addIndicesToAttributes(resourceId, attributes);
+        }
+
+        // Create the resource and sample
+        Resource resource = new Resource(resourceId, Optional.of(attributes));
+        return new Sample(
+                Timestamp.fromEpochMillis(m.getTimeStamp()),
+                newtsConfig.getContext(),
+                resource,
+                m.getMetricName(),
+                metricType,
+                ValueType.compose(m.getMetricValue(), metricType));
+    }
+
+    @VisibleForTesting
+    protected TSDRMetricRecord toMetricRecord(Resource r, Sample s) {
+        Map<String, String> attributes = r.getAttributes().or(new HashMap<String, String>(0));
+        String metricKey = attributes.get("metricKey");
+        TSDRMetricRecordBuilder b = new TSDRMetricRecordBuilder();
+        b.setNodeID(FormatUtil.getNodeIdFromTSDRKey(metricKey));
+        b.setTimeStamp(s.getTimestamp().asMillis());
+        b.setMetricName(s.getName());
+        b.setMetricValue(new BigDecimal(s.getValue().doubleValue()));
+        b.setTSDRDataCategory(DataCategory.valueOf(FormatUtil.getDataCategoryFromTSDRKey(metricKey)));
+        b.setRecordKeys(FormatUtil.getRecordKeysFromTSDRKey(metricKey));
+        return b.build();
+    }
+
+    /*
+     * Extends the attribute map with indices used by the {@link org.opennms.netmgt.dao.support.NewtsResourceStorageDao}.
+     *
+     * A resource path of the form [a, b, c, d] will be indexed with:
+     * <ul>
+     * <li> _idx1: (a, 4)
+     * <li> _idx2: (a:b, 4)
+     * <li> _idx3: (a:b:c, 4)
+     */
+    private static void addIndicesToAttributes(String resourceId, Map<String, String> attributes) {
+        final List<String> els = splitter.splitIdIntoElements(resourceId);
+        final int N = els.size();
+        for (int i = 0; i < N; i++) {
+            final String id = splitter.joinElementsToId(els.subList(0, i+1));
+            attributes.put("_idx" + i, String.format("(%s,%d)", id, N));
+        }
+    }
+
+    @VisibleForTesting
+    protected static String getResourceIndex(DataCategory dataCategory, List<RecordKeys> recordKeys) {
+        Map<String, String> indexedRecordKeys = Maps.newHashMap();
+        for (RecordKey recordKey : recordKeys) {
+            indexedRecordKeys.put(recordKey.getKeyName(), recordKey.getKeyValue());
+        }
+
+        switch (dataCategory) {
+        case FLOWSTATS:
+            return String.format("%s_%s", indexedRecordKeys.get("Table"), indexedRecordKeys.get("Flow"));
+        case FLOWTABLESTATS:
+            return indexedRecordKeys.get("Table");
+        case PORTSTATS:
+            return indexedRecordKeys.get("NodeConnector");       
+        default:
+            LOG.warn("Unsupported data category {} with record keys: {}", dataCategory, recordKeys);
+            return "_1";
+        }
+    }
+
+    @VisibleForTesting
+    protected String getNewtsResourceId(TSDRMetricRecord m) {
+        List<String> pathElements = Lists.newArrayList();
+        pathElements.add(m.getNodeID().replace(":", "_")); // OpenNMS chokes on ':'
+        pathElements.add(m.getTSDRDataCategory().toString());
+        pathElements.add(getResourceIndex(m.getTSDRDataCategory(), m.getRecordKeys()));
+        return  newtsConfig.getResourcePrefix() + splitter.joinElementsToId(pathElements) + newtsConfig.getResourceSuffix();
+    }
+
+    @VisibleForTesting
+    @SuppressWarnings("incomplete-switch")
+    protected MetricType getMetricType(DataCategory dataCategory, String metricName) {
+        switch (dataCategory) {
+        case FLOWSTATS:
+            return MetricType.COUNTER;
+        case FLOWTABLESTATS:
+            switch (metricName) {
+            case "ActiveFlows": return MetricType.GAUGE;
+            case "PacketLookup": return MetricType.COUNTER;
+            case "PacketMatch": return MetricType.COUNTER;
+            }
+        case PORTSTATS:
+            return MetricType.COUNTER;
+        }
+        return MetricType.GAUGE;
     }
 }
