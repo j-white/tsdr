@@ -11,8 +11,8 @@ package org.opendaylight.tsdr.spi.util;
 import java.util.Date;
 
 import org.opendaylight.tsdr.spi.model.TSDRConstants;
-import org.opendaylight.tsdr.spi.persistence.TsdrPersistenceService;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
+import org.opendaylight.tsdr.spi.persistence.TsdrLogPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrMetricPersistenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,23 +26,40 @@ import org.slf4j.LoggerFactory;
 public class TsdrPersistenceServiceUtil {
     private static final Logger
         log = LoggerFactory.getLogger(TsdrPersistenceServiceUtil.class);
-    static private TsdrPersistenceService tsdrPersistenceService;
-    static public TsdrPersistenceService getTsdrPersistenceService (){
-          return tsdrPersistenceService;
+    // JW: TODO: Refactor this
+    static private TsdrMetricPersistenceService tsdrMetricPersistenceService;
+    static private TsdrLogPersistenceService tsdrLogPersistenceService;
+    static public TsdrMetricPersistenceService getTsdrMetricPersistenceService (){
+          return tsdrMetricPersistenceService;
     }
-    static public void setTsdrPersistenceService (TsdrPersistenceService service){
-        log.info("setTsdrPersistenceService: called " + new Date());
-          if(tsdrPersistenceService != null){
-              tsdrPersistenceService.stop(
+    static public void setMetricTsdrPersistenceService (TsdrMetricPersistenceService service){
+        log.info("setMetricTsdrPersistenceService: called " + new Date());
+          if(tsdrMetricPersistenceService != null){
+              tsdrMetricPersistenceService.stop(
                   TSDRConstants.STOP_PERSISTENCE_SERVICE_TIMEOUT);
           }
-          tsdrPersistenceService = service;
+          tsdrMetricPersistenceService = service;
 
-          if(tsdrPersistenceService !=null) {
-
-              tsdrPersistenceService
+          if(tsdrMetricPersistenceService !=null) {
+              tsdrMetricPersistenceService
                   .start(TSDRConstants.START_PERSISTENCE_SERVICE_TIMEOUT);
           }
+    }
+    static public TsdrLogPersistenceService getTsdrLogPersistenceService (){
+        return tsdrLogPersistenceService;
+    }
+    static public void setLogTsdrPersistenceService (TsdrLogPersistenceService service){
+          log.info("setLogTsdrPersistenceService: called " + new Date());
+            if(tsdrLogPersistenceService != null){
+                tsdrLogPersistenceService.stop(
+                    TSDRConstants.STOP_PERSISTENCE_SERVICE_TIMEOUT);
+            }
+            tsdrLogPersistenceService = service;
+
+            if(tsdrLogPersistenceService !=null) {
+                tsdrLogPersistenceService
+                    .start(TSDRConstants.START_PERSISTENCE_SERVICE_TIMEOUT);
+            }
     }
 /**
  * Return String type category name from Category Enum.
