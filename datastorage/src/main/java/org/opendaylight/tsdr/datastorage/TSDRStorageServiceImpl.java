@@ -7,23 +7,22 @@
  */
 package org.opendaylight.tsdr.datastorage;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.concurrent.Future;
 
-import org.opendaylight.tsdr.datastorage.aggregate.IntervalGenerator;
 import org.opendaylight.tsdr.datastorage.aggregate.AggregationFunction;
+import org.opendaylight.tsdr.datastorage.aggregate.IntervalGenerator;
 import org.opendaylight.tsdr.datastorage.persistence.TSDRPersistenceServiceFactory;
 import org.opendaylight.tsdr.spi.model.TSDRConstants;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRLogRecordsInput;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRLogRecordsOutput;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRLogRecordsOutputBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRAggregatedMetricsInput;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRAggregatedMetricsOutput;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRAggregatedMetricsOutputBuilder;
+import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRLogRecordsInput;
+import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRLogRecordsOutput;
+import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRLogRecordsOutputBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRMetricsInput;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRMetricsInputBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.GetTSDRMetricsOutput;
@@ -32,7 +31,6 @@ import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.PurgeAllTSDRReco
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.PurgeTSDRRecordInput;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.StoreTSDRLogRecordInput;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.StoreTSDRMetricRecordInput;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRService;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.gettsdraggregatedmetrics.output.AggregatedMetrics;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.gettsdraggregatedmetrics.output.AggregatedMetricsBuilder;
@@ -88,10 +86,11 @@ public class TSDRStorageServiceImpl implements TSDRService, AutoCloseable {
             return Futures.immediateFuture(RpcResultBuilder.<Void> success()
                     .build());
         }
-        List<TSDRRecord> tsdrMetricRecordList = new ArrayList<TSDRRecord>(input.getTSDRMetricRecord().size());
-        tsdrMetricRecordList.addAll(input.getTSDRMetricRecord());
-        if(TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore() != null) {
-            TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore().store(tsdrMetricRecordList);
+        if(TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore() != null) {
+            // JW: TODO: Insert a batch record
+            for (TSDRMetricRecord metricRecord : input.getTSDRMetricRecord()) {
+                TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore().store(metricRecord);
+            }            
         }else{
             log.warn("storeTSDRMetricRecord: cannot store the metric -- persistence service is found to be null");
         }
@@ -120,10 +119,17 @@ public class TSDRStorageServiceImpl implements TSDRService, AutoCloseable {
          DataCategory category = input.getTSDRDataCategory();
          Long timestamp = input.getRetentionTime();
 
-         if(TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore() != null) {
-             TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore().purgeTSDRRecords(category, timestamp);
+         // JW: TODO: Refactor? We can probably determine the right one back on the data category
+         if(TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore() != null) {
+             TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore().purgeTSDRRecords(category, timestamp);
          }else{
-             log.warn("purgeTSDRRecord -- persistence service is found to be null");
+             log.warn("purgeTSDRRecord -- metric persistence service is found to be null");
+         }
+         
+         if(TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore() != null) {
+             TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore().purgeTSDRRecords(category, timestamp);
+         }else{
+             log.warn("purgeTSDRRecord -- log persistence service is found to be null");
          }
          log.info("Exiting TSDRStorageService.purgeTSDRRecord()");
          return Futures.immediateFuture(RpcResultBuilder.<Void> success()
@@ -148,11 +154,18 @@ public class TSDRStorageServiceImpl implements TSDRService, AutoCloseable {
 
          Long timestamp = input.getRetentionTime();
 
-         if(TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore() != null) {
-             TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore().purgeAllTSDRRecords(timestamp);
+         if(TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore() != null) {
+             TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore().purgeAllTSDRRecords(timestamp);;
          }else{
-             log.warn("purgeAllTSDRRecord -- persistence service is found to be null");
+             log.warn("purgeTSDRRecord -- metric persistence service is found to be null");
          }
+         
+         if(TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore() != null) {
+             TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore().purgeAllTSDRRecords(timestamp);
+         }else{
+             log.warn("purgeTSDRRecord -- log persistence service is found to be null");
+         }
+
          log.info("Exiting TSDRStorageService.purgeAllTSDRRecord()");
          return Futures.immediateFuture(RpcResultBuilder.<Void> success()
              .build());
@@ -164,15 +177,17 @@ public class TSDRStorageServiceImpl implements TSDRService, AutoCloseable {
      */
     public void close() throws Exception {
 
-            TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore().stop(
+            TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore().stop(
                 TSDRConstants.STOP_PERSISTENCE_SERVICE_TIMEOUT);
 
+            TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore().stop(
+                    TSDRConstants.STOP_PERSISTENCE_SERVICE_TIMEOUT);
 
     }
 
     @Override
     public Future<RpcResult<GetTSDRMetricsOutput>> getTSDRMetrics(GetTSDRMetricsInput input) {
-        List<TSDRMetricRecord> result = TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore().getTSDRMetricRecords(input.getTSDRDataCategory(), input.getStartTime(), input.getEndTime());
+        List<TSDRMetricRecord> result = TSDRPersistenceServiceFactory.getTSDRMetricPersistenceDataStore().getTSDRMetricRecords(input.getTSDRDataCategory(), input.getStartTime(), input.getEndTime());
         GetTSDRMetricsOutputBuilder output = new GetTSDRMetricsOutputBuilder();
         List<Metrics> metrics = new LinkedList<Metrics>();
         for(TSDRMetricRecord m:result){
@@ -253,7 +268,7 @@ public class TSDRStorageServiceImpl implements TSDRService, AutoCloseable {
 
     @Override
     public Future<RpcResult<GetTSDRLogRecordsOutput>> getTSDRLogRecords(GetTSDRLogRecordsInput input) {
-        List<TSDRLogRecord> result = TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore().getTSDRLogRecords(input.getTSDRDataCategory(), input.getStartTime(), input.getEndTime());
+        List<TSDRLogRecord> result = TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore().getTSDRLogRecords(input.getTSDRDataCategory(), input.getStartTime(), input.getEndTime());
         GetTSDRLogRecordsOutputBuilder output = new GetTSDRLogRecordsOutputBuilder();
         List<Logs> logs = new LinkedList<Logs>();
         for(TSDRLogRecord l:result){
@@ -278,10 +293,11 @@ public class TSDRStorageServiceImpl implements TSDRService, AutoCloseable {
             log.error("Input of storeTSDRLog is null");
             return Futures.immediateFuture(RpcResultBuilder.<Void> success().build());
         }
-        List<TSDRRecord> tsdrLogRecordList = new ArrayList<TSDRRecord>(input.getTSDRLogRecord().size());
-        tsdrLogRecordList.addAll(input.getTSDRLogRecord());
-        if(TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore() != null) {
-            TSDRPersistenceServiceFactory.getTSDRPersistenceDataStore().store(tsdrLogRecordList);
+        if(TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore() != null) {
+            // JW TODO: Bulk insert
+            for (TSDRLogRecord record : input.getTSDRLogRecord()) {
+                TSDRPersistenceServiceFactory.getTSDRLogPersistenceDataStore().store(record);
+            }
         }else{
             log.warn("storeTSDRMetricRecord: cannot store the metric -- persistence service is found to be null");
         }

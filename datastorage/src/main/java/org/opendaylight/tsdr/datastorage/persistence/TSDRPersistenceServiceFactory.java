@@ -9,8 +9,8 @@
 package org.opendaylight.tsdr.datastorage.persistence;
 
 
-import org.opendaylight.tsdr.spi.model.TSDRConstants;
-import org.opendaylight.tsdr.spi.persistence.TsdrPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrLogPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrMetricPersistenceService;
 import org.opendaylight.tsdr.spi.util.TsdrPersistenceServiceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
 public class TSDRPersistenceServiceFactory {
     private static final Logger log = LoggerFactory.getLogger(TSDRPersistenceServiceFactory.class);
 
-    private static TsdrPersistenceService persistenceService = null;
+    private static TsdrMetricPersistenceService metricPersistenceService = null;
+    private static TsdrLogPersistenceService logPersistenceService = null;
 
     /**
      * Default constructor
@@ -44,17 +45,35 @@ public class TSDRPersistenceServiceFactory {
      * Obtain the TSDR Persistence Data Store
      * @return
      */
-    public static TsdrPersistenceService getTSDRPersistenceDataStore( ){
-        log.debug("Entering getTSDRPersistenceDataStore()");
-        if(persistenceService== null){
-            persistenceService = TsdrPersistenceServiceUtil.getTsdrPersistenceService();
-            if(persistenceService == null) {
-                log.error("persistenceService is found to be null");
+    public static TsdrMetricPersistenceService getTSDRMetricPersistenceDataStore( ){
+        log.debug("Entering getTSDRMetricPersistenceDataStore()");
+        if(metricPersistenceService == null){
+            metricPersistenceService = TsdrPersistenceServiceUtil.getTsdrMetricPersistenceService();
+            if(metricPersistenceService == null) {
+                log.error("metricPersistenceService is found to be null");
             }
         }
 
-        log.debug("Exiting getTSDRPersistenceDataStore()");
-        return persistenceService;
+        log.debug("Exiting getTSDRMetricPersistenceDataStore()");
+        return metricPersistenceService;
     }
 
+
+    /**
+     * Obtain the TSDR Persistence Data Store
+     * @return
+     */
+    // JW: TODO: Refactor 
+    public static TsdrLogPersistenceService getTSDRLogPersistenceDataStore( ){
+        log.debug("Entering getTSDRLogPersistenceDataStore()");
+        if(logPersistenceService == null){
+            logPersistenceService = TsdrPersistenceServiceUtil.getTsdrLogPersistenceService();
+            if(logPersistenceService == null) {
+                log.error("logPersistenceService is found to be null");
+            }
+        }
+
+        log.debug("Exiting getTSDRLogPersistenceDataStore()");
+        return logPersistenceService;
+    }
 }
