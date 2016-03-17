@@ -10,9 +10,11 @@ package org.opendaylight.tsdr.spi.command;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.opendaylight.tsdr.spi.persistence.TsdrPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrLogPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrMetricPersistenceService;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecordBuilder;
@@ -73,17 +75,19 @@ public class AbstractListMetricsCommandTest {
         };
         cmd.category = "EXTERNAL";
         cmd.doExecute();
-        TsdrPersistenceService service = Mockito.mock(TsdrPersistenceService.class);
-        cmd.setPersistenceService(service);
+        TsdrMetricPersistenceService metricService = Mockito.mock(TsdrMetricPersistenceService.class);
+        cmd.setMetricPersistenceService(metricService);
         cmd.doExecute();
         List<TSDRMetricRecord> metric = new ArrayList<>();
         metric.add(createMetricRecord());
-        Mockito.when(service.getTSDRMetricRecords(Mockito.anyString(),Mockito.anyLong(),Mockito.anyLong())).thenReturn(metric);
+        Mockito.when(metricService.getTSDRMetricRecords(Mockito.anyString(),Mockito.anyLong(),Mockito.anyLong())).thenReturn(metric);
         cmd.doExecute();
 
+        TsdrLogPersistenceService logService = Mockito.mock(TsdrLogPersistenceService.class);
+        cmd.setLogPersistenceService(logService);
         List<TSDRLogRecord> logs = new ArrayList<>();
         logs.add(createLogRecord());
-        Mockito.when(service.getTSDRLogRecords(Mockito.anyString(),Mockito.anyLong(),Mockito.anyLong())).thenReturn(logs);
+        Mockito.when(logService.getTSDRLogRecords(Mockito.anyString(),Mockito.anyLong(),Mockito.anyLong())).thenReturn(logs);
         cmd.category = DataCategory.LOGRECORDS.name();
         cmd.doExecute();
         cmd.startDateTime = "10/10/2010 22:22:22";

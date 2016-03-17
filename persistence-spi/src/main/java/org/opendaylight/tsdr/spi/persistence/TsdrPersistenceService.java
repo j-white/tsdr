@@ -8,15 +8,10 @@
  */
 package org.opendaylight.tsdr.spi.persistence;
 
-
-import java.util.List;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRRecord;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
 
 /**
- * This interface provides a list of APIs for accessing TSDR persistence data store.
+ * This interface provides commons APIs implemented by the different persistence services types.
  *
  * @author <a href="mailto:yuling_c@dell.com">YuLing Chen</a>
  *
@@ -34,24 +29,6 @@ import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricr
 public interface TsdrPersistenceService {
 
     /**
-     * Store TSDRMetricRecord.
-     * @param metricRecord - An instance of tsdr metric record
-     */
-    void store(TSDRMetricRecord metricRecord);
-
-    /**
-     * Store TSDRMetricRecord.
-     * @param logRecord - an instane of tsdr log record
-     */
-    void store(TSDRLogRecord logRecord);
-
-    /**
-     * Store a list of TSDRRecord.
-     * @param recordList - a list of tsdrRecord
-     */
-    void store(List<TSDRRecord> recordList);
-
-    /**
      * Starts the persistence service
      *
      * @param timeout -- indicates the time given for the starting of persistence,
@@ -66,28 +43,6 @@ public interface TsdrPersistenceService {
      * after which the caller will assume its stopped
      */
     void stop(int timeout);
-
-    /**
-     * Returns the list of metrics based on startDateTime and endDateTime
-     * If startDateTime OR(/AND)  endDateTime is not specified returns the recent
-     * predefined N metrics
-     *
-     * @param tsdrMetricKey -- The tsdr metric key, can also be just Data Category,
-     * @param startDateTime  --The start time in milis
-     * @param endDateTime   -- The end time in milis
-     * @return - List of persistence store dependents records
-     */
-    //format of tsdrMetricKey is "[NID=<node id>][DC=<data category>][MN=<metric name>][RK=<a list or record keys>][TS=<timestamp - for hbase>]"
-    List<TSDRMetricRecord> getTSDRMetricRecords(String tsdrMetricKey,long startDateTime, long endDateTime);
-
-    /**
-     * Returns the TSDRLogRecords based on category, startTime, and endTime
-     * @param tsdrLogKey - The tsdr log key, can be also just Data Category
-     * @param startTime - The starting time
-     * @param endTime - The end time
-     * @return - A list of log records
-     */
-    List<TSDRLogRecord> getTSDRLogRecords(String tsdrLogKey, long startTime, long endTime);
 
     /**
      * Purges the data from TSDR data store.

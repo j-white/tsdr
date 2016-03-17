@@ -13,10 +13,12 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
 import org.apache.karaf.shell.commands.Argument;
 import org.apache.karaf.shell.commands.Command;
 import org.apache.karaf.shell.console.OsgiCommandSupport;
-import org.opendaylight.tsdr.spi.persistence.TsdrPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrLogPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrMetricPersistenceService;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
@@ -33,7 +35,8 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractListMetricsCommand extends OsgiCommandSupport {
     private final Logger
             log = LoggerFactory.getLogger(AbstractListMetricsCommand.class);
-    protected TsdrPersistenceService persistenceService;
+    protected TsdrMetricPersistenceService metricPersistenceService;
+    protected TsdrLogPersistenceService logPersistenceService;
 
     @Argument(index=0, name="category", required=true, description="The category of the metrics we want to get", multiValued=false)
     public String category = null;
@@ -42,10 +45,13 @@ public abstract class AbstractListMetricsCommand extends OsgiCommandSupport {
     @Argument(index=2, name="endDateTime", required=false, description="list the metrics till this time (format: MM/dd/yyyy HH:mm:ss)", multiValued=false)
     public String endDateTime = null;
 
-    public void setPersistenceService(TsdrPersistenceService persistenceService) {
-        this.persistenceService = persistenceService;
+    public void setMetricPersistenceService(TsdrMetricPersistenceService metricPersistenceService) {
+        this.metricPersistenceService = metricPersistenceService;
     }
 
+    public void setLogPersistenceService(TsdrLogPersistenceService logPersistenceService) {
+        this.logPersistenceService = logPersistenceService;
+    }
 
     protected long getDate(String dateTime){
         if(dateTime == null){
@@ -80,25 +86,29 @@ public abstract class AbstractListMetricsCommand extends OsgiCommandSupport {
             return null;
         }
         DataCategory dataCategory = DataCategory.valueOf(category);
-        if (persistenceService != null) {
-            if(dataCategory== DataCategory.NETFLOW || dataCategory==DataCategory.SYSLOG || dataCategory==DataCategory.LOGRECORDS){
-                List<TSDRLogRecord> logs = persistenceService.getTSDRLogRecords(category, startDate, endDate);
+
+        if(dataCategory== DataCategory.NETFLOW || dataCategory==DataCategory.SYSLOG || dataCategory==DataCategory.LOGRECORDS){
+            if (logPersistenceService != null) {
+                List<TSDRLogRecord> logs = logPersistenceService.getTSDRLogRecords(category, startDate, endDate);
                 if (logs == null || logs.isEmpty()) {
                     System.out.println("No data of this category in the specified time range. ");
                     return null;
                 }
                 System.out.println(listLogs(logs));
-
-            }else {
-                List<TSDRMetricRecord> metrics = persistenceService.getTSDRMetricRecords(category, startDate, endDate);
+            } else {
+                log.warn("ListMetricsCommand: log persistence service is found to be null.");
+            }
+        } else {
+            if (metricPersistenceService != null) {
+                List<TSDRMetricRecord> metrics = metricPersistenceService.getTSDRMetricRecords(category, startDate, endDate);
                 if (metrics == null || metrics.isEmpty()) {
                     System.out.println("No data of this category in the specified time range. ");
                     return null;
                 }
                 System.out.println(listMetrics(metrics));
+            } else {
+                log.warn("ListMetricsCommand: metric persistence service is found to be null.");
             }
-        } else {
-            log.warn("ListMetricsCommand: persistence service is found to be null.");
         }
         return null;
     }
