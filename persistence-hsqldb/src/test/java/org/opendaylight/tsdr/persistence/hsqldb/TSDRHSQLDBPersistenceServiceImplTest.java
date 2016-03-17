@@ -8,15 +8,11 @@
 package org.opendaylight.tsdr.persistence.hsqldb;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.opendaylight.tsdr.persistence.hsqldb.HSQLDBStore;
-import org.opendaylight.tsdr.persistence.hsqldb.TSDRHSQLDBPersistenceServiceImpl;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
 
@@ -48,6 +44,7 @@ public class TSDRHSQLDBPersistenceServiceImplTest {
         Mockito.verify(store, Mockito.atLeast(1)).store(logRecord);
     }
 
+    /*
     @Test
     public void testStoreList() throws SQLException {
         List<TSDRRecord> list = new ArrayList<>(2);
@@ -59,7 +56,8 @@ public class TSDRHSQLDBPersistenceServiceImplTest {
         Mockito.verify(store, Mockito.atLeast(1)).store(logRecord);
         Mockito.verify(store, Mockito.atLeast(1)).store(metricRecord);
     }
-
+    */
+    
     @Test
     public void testStart(){
         impl.start(100);

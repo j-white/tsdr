@@ -11,20 +11,18 @@ package org.opendaylight.tsdr.persistence.hbase;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
+
 import org.apache.hadoop.hbase.TableNotFoundException;
-import org.opendaylight.tsdr.spi.persistence.TsdrPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrLogPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrMetricPersistenceService;
 import org.opendaylight.tsdr.spi.scheduler.SchedulerService;
 import org.opendaylight.tsdr.spi.util.FormatUtil;
 import org.opendaylight.tsdr.spi.util.TsdrPersistenceServiceUtil;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRMetric;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecordBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
@@ -50,7 +48,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class TSDRHBasePersistenceServiceImpl  implements TsdrPersistenceService {
+public class TSDRHBasePersistenceServiceImpl implements TsdrLogPersistenceService, TsdrMetricPersistenceService {
 
     private static final Logger log = LoggerFactory.getLogger(TSDRHBasePersistenceServiceImpl.class);
     public ScheduledFuture future;
@@ -59,7 +57,8 @@ public class TSDRHBasePersistenceServiceImpl  implements TsdrPersistenceService 
      * Constructor.
      */
     public TSDRHBasePersistenceServiceImpl(){
-        TsdrPersistenceServiceUtil.setTsdrPersistenceService(this);
+        TsdrPersistenceServiceUtil.setMetricTsdrPersistenceService(this);
+        TsdrPersistenceServiceUtil.setLogTsdrPersistenceService(this);
         log.info("TSDR HBase Data Store is initialized.");
         System.out.println("TSDR HBase Data Store was initialized. ");
 
@@ -105,6 +104,7 @@ public class TSDRHBasePersistenceServiceImpl  implements TsdrPersistenceService 
     /**
      * Store a list of TSDRMetricRecord.
     */
+    /*
     @Override
     public void store(List<TSDRRecord> recordList){
         log.debug("Entering store(List<TSDRRecord>)");
@@ -148,6 +148,7 @@ public class TSDRHBasePersistenceServiceImpl  implements TsdrPersistenceService 
         }
         log.debug("Exiting store(List<TSDRRecord>)");
     }
+    */
 
     /**
      * Start TSDRHBasePersistenceService.

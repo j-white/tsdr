@@ -10,11 +10,12 @@ package org.opendaylight.tsdr.persistence.hsqldb;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
+
 import org.opendaylight.tsdr.spi.model.TSDRConstants;
-import org.opendaylight.tsdr.spi.persistence.TsdrPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrLogPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TsdrMetricPersistenceService;
 import org.opendaylight.tsdr.spi.util.TsdrPersistenceServiceUtil;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
 import org.slf4j.Logger;
@@ -23,12 +24,13 @@ import org.slf4j.LoggerFactory;
 /**
  * @author Sharon Aicler(saichler@gmail.com)
  **/
-public class TSDRHSQLDBPersistenceServiceImpl implements TsdrPersistenceService{
+public class TSDRHSQLDBPersistenceServiceImpl implements TsdrLogPersistenceService, TsdrMetricPersistenceService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TSDRHSQLDBPersistenceServiceImpl.class);
     private HSQLDBStore store = null;
 
     public TSDRHSQLDBPersistenceServiceImpl(){
-        TsdrPersistenceServiceUtil.setTsdrPersistenceService(this);
+        TsdrPersistenceServiceUtil.setMetricTsdrPersistenceService(this);
+        TsdrPersistenceServiceUtil.setLogTsdrPersistenceService(this);
         System.out.println("TSDR HSQLDB Data Store was initialized.");
     }
 
@@ -50,6 +52,7 @@ public class TSDRHSQLDBPersistenceServiceImpl implements TsdrPersistenceService{
         }
     }
 
+    /*
     @Override
     public void store(List<TSDRRecord> metricRecordList) {
        for(TSDRRecord record:metricRecordList){
@@ -61,6 +64,7 @@ public class TSDRHSQLDBPersistenceServiceImpl implements TsdrPersistenceService{
            }
        }
     }
+    */
 
     @Override
     public void start(int timeout) {

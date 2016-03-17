@@ -8,6 +8,11 @@
  */
 package org.opendaylight.tsdr.datastorage.persistence.hbase;
 
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,7 +25,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ScheduledFuture;
 
-import org.apache.hadoop.hbase.TableNotFoundException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -36,7 +40,6 @@ import org.opendaylight.tsdr.spi.scheduler.SchedulerService;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRLog;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRMetric;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecordBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
@@ -46,11 +49,6 @@ import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.tsdrrecord.Recor
 
 import jline.internal.ShutdownHooks.Task;
 import junit.framework.Assert;
-
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 
 /**
  * Unit Test for HBase data store under TSDR.
@@ -362,6 +360,7 @@ public class TSDRHBasePersistenceServiceImplTest {
         assertTrue(result);
     }
 
+    /*
     @Test
     public void testStoreList() {
         Boolean result = false;
@@ -407,7 +406,8 @@ public class TSDRHBasePersistenceServiceImplTest {
         recordList2.add(tsdrLog2);
         storageService1.store(recordList2);
     }
-
+    */
+    
     @After
     public void teardown() {
         storageService.stop(0);
