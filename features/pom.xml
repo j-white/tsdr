@@ -223,6 +223,25 @@
       </dependency>
       <dependency>
           <groupId>org.opendaylight.tsdr</groupId>
+          <artifactId>tsdr-persistence-newts</artifactId>
+          <version>${project.version}</version>
+      </dependency>
+      <dependency>
+          <groupId>org.opendaylight.tsdr</groupId>
+          <artifactId>tsdr-persistence-newts</artifactId>
+          <version>${project.version}</version>
+          <type>xml</type>
+          <classifier>config</classifier>
+      </dependency>
+      <dependency>
+          <groupId>org.opennms.newts</groupId>
+          <artifactId>newts-karaf</artifactId>
+          <version>${newts.version}</version>
+          <type>xml</type>
+          <classifier>features</classifier>
+      </dependency>
+      <dependency>
+          <groupId>org.opendaylight.tsdr</groupId>
           <artifactId>tsdr-persistence-hbase</artifactId>
           <version>${project.version}</version>
           <type>xml</type>

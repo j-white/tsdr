@@ -35,6 +35,8 @@
     <repository>mvn:org.ops4j.pax.jdbc/pax-jdbc-features/0.5.0/xml/features</repository>
     -->
     <repository>mvn:org.opendaylight.snmp/features-snmp/1.2.0-SNAPSHOT/xml/features</repository>
+    <repository>mvn:org.opennms.newts/newts-karaf/${newts.version}/xml/features</repository>
+
      <!-- HSQLDB data store with default openflow data collector for user convenience -->
     <feature name='odl-tsdr-hsqldb-all' version='${project.version}' description='OpenDaylight :: TSDR :: With hsqldb Persistence and openflow data collectors'>
             <feature version='${project.version}'>odl-tsdr-core</feature>
@@ -172,6 +174,17 @@
        <feature version='${project.version}'>odl-tsdr-core</feature>
        <bundle>mvn:org.opendaylight.tsdr/${artifactName}-persistence-cassandra/${project.version}</bundle>
        <configfile finalname="etc/tsdr-persistence-cassandra.properties">mvn:org.opendaylight.tsdr/${artifactName}-persistence-cassandra/${project.version}/xml/config</configfile>
+    </feature>
+
+    <!-- Newts persistence data store -->
+    <feature name='odl-tsdr-newts' version='${project.version}' description="OpenDaylight :: TSDR :: Newts Persistence">
+       <bundle>wrap:mvn:com.google.guava/guava/${guava.old.version}</bundle>
+       <bundle>mvn:org.opendaylight.tsdr/${artifactName}-persistence-spi/${project.version}</bundle>
+       <feature version='${project.version}'>odl-tsdr-core</feature>
+       <feature version='${newts.version}'>newts-cassandra</feature>
+       <feature version='${newts.version}'>newts-cassandra-search</feature>
+       <bundle>mvn:org.opendaylight.tsdr/${artifactName}-persistence-newts/${project.version}</bundle>
+       <configfile finalname="etc/tsdr-persistence-newts.properties">mvn:org.opendaylight.tsdr/${artifactName}-persistence-newts/${project.version}/xml/config</configfile>
     </feature>
 
     <!-- HSQLDB persistence data store -->
