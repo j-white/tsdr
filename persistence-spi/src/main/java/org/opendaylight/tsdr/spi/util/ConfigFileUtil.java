@@ -25,6 +25,7 @@ public class ConfigFileUtil {
     public static final String CASSANDRA_STORE_CONFIG_FILE = "./etc/tsdr-persistence-cassandra.properties";
     public static final String HBASE_STORE_CONFIG_FILE = "./etc/tsdr-persistence-hbase.properties";
     public static final String HSQLDB_STORE_CONFIG_FILE = "./etc/tsdr-persistence-hsqldb.properties";
+    public static final String NEWTS_STORE_CONFIG_FILE = "./etc/tsdr-persistence-newts.properties";
 
     public static final String METRIC_PERSISTENCE_PROPERTY = "metric-persistency";
     public static final String LOG_PERSISTENCE_PROPERTY = "log-persistency";

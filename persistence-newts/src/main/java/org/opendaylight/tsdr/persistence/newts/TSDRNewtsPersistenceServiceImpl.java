@@ -8,27 +8,20 @@
 package org.opendaylight.tsdr.persistence.newts;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.opendaylight.tsdr.spi.model.TSDRConstants;
-import org.opendaylight.tsdr.spi.persistence.TsdrPersistenceService;
+import org.opendaylight.tsdr.spi.persistence.TSDRMetricPersistenceService;
 import org.opendaylight.tsdr.spi.util.FormatUtil;
-import org.opendaylight.tsdr.spi.util.TsdrPersistenceServiceUtil;
+import org.opendaylight.yang.gen.v1.opendaylight.tsdr.metric.data.rev160325.storetsdrmetricrecord.input.TSDRMetricRecord;
+import org.opendaylight.yang.gen.v1.opendaylight.tsdr.metric.data.rev160325.storetsdrmetricrecord.input.TSDRMetricRecordBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.DataCategory;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.RecordKey;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.TSDRRecord;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrlogrecord.input.TSDRLogRecord;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecordBuilder;
 import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.tsdrrecord.RecordKeys;
 import org.opennms.newts.api.Context;
 import org.opennms.newts.api.MetricType;
@@ -47,6 +40,7 @@ import org.opennms.newts.api.search.SearchResults.Result;
 import org.opennms.newts.api.search.Term;
 import org.opennms.newts.api.search.TermQuery;
 import org.opennms.newts.cassandra.CassandraSession;
+import org.opennms.newts.cassandra.CassandraSessionImpl;
 import org.opennms.newts.cassandra.ContextConfigurations;
 import org.opennms.newts.cassandra.search.CassandraIndexer;
 import org.opennms.newts.cassandra.search.CassandraIndexerSampleProcessor;
@@ -101,11 +95,10 @@ import com.google.common.collect.Sets;
  *                          resource type to parse them
  * !!Possible workaround!!: Add the record keys as "string attributes" and reference
  *                          those in the resource labels i.e. resourceLabel="${diskIODevice}"
- * C) We don't support storing log data
  *
  * @author Jesse White (jesse@opennms.org)
  **/
-public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
+public class TSDRNewtsPersistenceServiceImpl implements TSDRMetricPersistenceService {
     private static final Logger LOG = LoggerFactory.getLogger(TSDRNewtsPersistenceServiceImpl.class);
 
     private static final EscapableResourceIdSplitter splitter = new EscapableResourceIdSplitter();
@@ -114,40 +107,28 @@ public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
 
     private CassandraSearcher searcher;
     private CassandraSampleRepository sampleRepository;
-    private CassandraSession session;
 
     public TSDRNewtsPersistenceServiceImpl() {
-        this(new NewtsConfig());
+        this(new NewtsConfig(), true);
     }
 
-    public TSDRNewtsPersistenceServiceImpl(NewtsConfig newtsConfig) {
-        this(newtsConfig, true);
-    }
-
-    public TSDRNewtsPersistenceServiceImpl(NewtsConfig newtsConfig, boolean autoRegister) {
+    public TSDRNewtsPersistenceServiceImpl(NewtsConfig newtsConfig, boolean start) {
         this.newtsConfig = Objects.requireNonNull(newtsConfig);
-        if (autoRegister) {
-            register();
+
+        if (!start) {
+            return;
         }
-    }
-
-    public void register() {
-        TsdrPersistenceServiceUtil.setTsdrPersistenceService(this);
-        LOG.info("Initialized Newts store with keyspace={}, host={} and port={}.",
-                newtsConfig.getKeyspace(), newtsConfig.getHost(), newtsConfig.getPort());
-    }
-
-    @Override
-    public void start(int timeout) {
+        
         MetricRegistry registry = new MetricRegistry();
         ContextConfigurations contextConfigurations = new ContextConfigurations();
-        CassandraSession session = new CassandraSession(
+        CassandraSession session = new CassandraSessionImpl(
                 newtsConfig.getKeyspace(),
                 newtsConfig.getHost(),
                 newtsConfig.getPort(),
                 newtsConfig.getCompression(),
                 newtsConfig.getUser(),
-                newtsConfig.getPassword());
+                newtsConfig.getPassword(),
+                newtsConfig.getSsl());
         ResourceMetadataCache cache = new GuavaResourceMetadataCache(newtsConfig.getCacheSize(), registry);
         CassandraIndexer indexer = new CassandraIndexer(
                 session,
@@ -166,45 +147,37 @@ public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
                 registry,
                 sampleProcessorService,
                 contextConfigurations);
-    }
- 
-    @Override
-    public void stop(int timeout) {
-        try {
-            session.shutdown().get(timeout, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException | ExecutionException | TimeoutException e) {
-            LOG.warn("Failed to shutdown Cassandra session.", e);
-        }
-        session = null;
-        searcher = null;
-        sampleRepository = null;
+        
+        LOG.info("Initialized Newts store with keyspace={}, host={} and port={}.",
+                newtsConfig.getKeyspace(), newtsConfig.getHost(), newtsConfig.getPort());
     }
 
     @Override
-    public void store(TSDRMetricRecord m) {
-        store(Collections.singletonList((TSDRRecord)m));
+    public void storeMetric(TSDRMetricRecord metricRecord) {
+        storeMetric(Lists.newArrayList(metricRecord));
     }
 
     @Override
-    public void store(TSDRLogRecord m) {
-        store(Collections.singletonList((TSDRRecord)m));
-    }
-
-    @Override
-    public void store(List<TSDRRecord> metricRecordList) {
+    public void storeMetric(List<TSDRMetricRecord> recordList) {
         List<Sample> samples = Lists.newArrayList();
-        for (TSDRRecord record : metricRecordList) {
-            if (record instanceof TSDRMetricRecord) {
-                samples.add(toSample((TSDRMetricRecord)record));
-            } else if (record instanceof TSDRLogRecord) {
-                LOG.warn("Newts cannot store log records.");
-            } else {
-                LOG.error("Unknown record type {} will not be stored.", record.getClass());
-            }
+        for (TSDRMetricRecord record : recordList) {
+            samples.add(toSample(record));
          }
         sampleRepository.insert(samples);
     }
 
+    @Override
+    public void purge(long retentionTime) {
+        for (DataCategory dataCategory : DataCategory.values()) {
+            purge(dataCategory, retentionTime);
+        }
+    }
+
+    @Override
+    public void purge(DataCategory category, long retentionTime) {
+        LOG.info("Purging records with category {} earlier than {}.", category.name(), new Date(retentionTime));
+        // TODO: Search for category, and delete
+    }
 
     @Override
     public List<TSDRMetricRecord> getTSDRMetricRecords(String tsdrMetricKey, long startTime, long endTime) {
@@ -240,24 +213,6 @@ public class TSDRNewtsPersistenceServiceImpl implements TsdrPersistenceService {
 
         // Return the records, limiting the list in size
         return metricRecords.subList(0, Math.min(TSDRConstants.MAX_RESULTS_FROM_LIST_METRICS_COMMAND, metricRecords.size()));
-    }
-
-    @Override
-    public List<TSDRLogRecord> getTSDRLogRecords(String tsdrMetricKey, long startTime, long endTime) {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public void purgeTSDRRecords(DataCategory category, Long retentionTime) {
-        LOG.info("Purging records with category {} earlier than {}.", category.name(), new Date(retentionTime));
-        // TODO: Search for category, and delete
-    }
-
-    @Override
-    public void purgeAllTSDRRecords(Long retentionTime) {
-        for (DataCategory dataCategory : DataCategory.values()) {
-            purgeTSDRRecords(dataCategory, retentionTime);
-        }
     }
 
     @VisibleForTesting

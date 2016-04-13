@@ -20,7 +20,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.opendaylight.tsdr.spi.util.FormatUtil;
-import org.opendaylight.yang.gen.v1.opendaylight.tsdr.rev150219.storetsdrmetricrecord.input.TSDRMetricRecord;
+import org.opendaylight.yang.gen.v1.opendaylight.tsdr.metric.data.rev160325.storetsdrmetricrecord.input.TSDRMetricRecord;
 import org.opennms.newts.cassandra.NewtsInstance;
 
 import com.google.common.collect.Lists;
@@ -43,7 +43,7 @@ public class TSDRNewtsPersistenceServiceImplIT {
         newtsConfig.setHost(newtsInstance.getHost());
         newtsConfig.setPort(newtsInstance.getPort());
         newtsConfig.setKeyspace(newtsInstance.getKeyspace());
-        impl = new TSDRNewtsPersistenceServiceImpl(newtsConfig);
+        impl = new TSDRNewtsPersistenceServiceImpl(newtsConfig, true);
     }
 
     @Test
@@ -57,7 +57,7 @@ public class TSDRNewtsPersistenceServiceImplIT {
         assertEquals(0, impl.getTSDRMetricRecords(metricKey, now - 1000, now + 1000).size());
 
         // Store the record
-        impl.store(metricRecord);
+        impl.storeMetric(metricRecord);
 
         // Retrieve the records
         List<TSDRMetricRecord> expectedMetricRecords =  Lists.newArrayList(metricRecord);

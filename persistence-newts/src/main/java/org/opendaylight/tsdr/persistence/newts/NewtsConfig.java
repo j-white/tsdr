@@ -62,6 +62,11 @@ public class NewtsConfig {
         return password != null ? password : env(NewtsConstants.NEWTS_PASSWORD_KEY, NewtsConstants.NEWTS_PASSWORD_VALUE);
     }
 
+    public boolean getSsl() {
+        // TODO
+        return false;
+    }
+
     public void setPassword(String password) {
         this.password = password;
     }

@@ -39,7 +39,7 @@
                 <configuration>
                     <instructions>
                         <Bundle-Name>org.opendaylight.tsdr.newts</Bundle-Name>
-                        <Import-Package>*</Import-Package>
+                        <Bundle-Activator>org.opendaylight.tsdr.persistence.newts.Activator</Bundle-Activator>
                     </instructions>
                 </configuration>
             </plugin>
@@ -66,6 +66,11 @@
         <groupId>org.opendaylight.tsdr</groupId>
         <artifactId>tsdr-persistence-spi</artifactId>
         <version>${project.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>org.apache.felix.dependencymanager</artifactId>
+        <scope>provided</scope>
     </dependency>
     <dependency>
         <groupId>junit</groupId>
