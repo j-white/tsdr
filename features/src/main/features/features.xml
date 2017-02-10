@@ -212,4 +212,14 @@
         <configfile finalname="etc/tsdr-persistence-elasticsearch_log_mapping.json">mvn:org.opendaylight.tsdr/tsdr-persistence-elasticsearch/${project.version}/json/log_config</configfile>
         <configfile finalname="etc/tsdr-persistence-elasticsearch_binary_mapping.json">mvn:org.opendaylight.tsdr/tsdr-persistence-elasticsearch/${project.version}/json/binary_config</configfile>
     </feature>
+
+    <!-- In-Memory metric data store -->
+    <feature name='odl-tsdr-memory' version='${project.version}' description="OpenDaylight :: TSDR :: In-Memory Metric Data Store">
+       <bundle>wrap:mvn:com.google.guava/guava/${guava.old.version}</bundle>
+       <bundle>mvn:org.opendaylight.tsdr/tsdr-persistence-spi/${project.version}</bundle>
+       <feature version='${project.version}'>odl-tsdr-core</feature>
+       <bundle>mvn:org.opendaylight.tsdr/tsdr-persistence-memory/${project.version}</bundle>
+       <configfile finalname="etc/tsdr-persistence-memory.properties">mvn:org.opendaylight.tsdr/tsdr-persistence-memory/${project.version}/xml/config</configfile>
+    </feature>
+
 </features>

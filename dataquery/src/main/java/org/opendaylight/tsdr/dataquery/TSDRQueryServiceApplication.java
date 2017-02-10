@@ -14,6 +14,7 @@ import java.util.Set;
 import javax.ws.rs.core.Application;
 import org.opendaylight.tsdr.dataquery.rest.nbi.TSDRNBIRestAPI;
 import org.opendaylight.tsdr.dataquery.rest.query.TSDRLogQueryAPI;
+import org.opendaylight.tsdr.dataquery.rest.query.TSDRMetricsExportAPI;
 import org.opendaylight.tsdr.dataquery.rest.query.TSDRMetricsQueryAPI;
 
 /**
@@ -26,6 +27,6 @@ public class TSDRQueryServiceApplication extends Application {
 
     @Override
     public Set<Class<?>> getClasses() {
-        return new HashSet<Class<?>>(Arrays.asList(TSDRNBIRestAPI.class, TSDRMetricsQueryAPI.class, TSDRLogQueryAPI.class));
+        return new HashSet<Class<?>>(Arrays.asList(TSDRNBIRestAPI.class, TSDRMetricsQueryAPI.class, TSDRMetricsExportAPI.class, TSDRLogQueryAPI.class));
     }
 }

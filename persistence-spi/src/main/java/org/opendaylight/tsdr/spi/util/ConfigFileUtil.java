@@ -28,6 +28,7 @@ public final class ConfigFileUtil {
     public static final String HBASE_STORE_CONFIG_FILE = CONFIG_DIR + "tsdr-persistence-hbase.properties";
     public static final String HSQLDB_STORE_CONFIG_FILE = CONFIG_DIR + "tsdr-persistence-hsqldb.properties";
     public static final String ELASTICSEARCH_STORE_CONFIG_FILE = CONFIG_DIR + "tsdr-persistence-elasticsearch.properties";
+    public static final String MEMORY_STORE_CONFIG_FILE = CONFIG_DIR + "tsdr-persistence-memory.properties";
 
     public static final String METRIC_PERSISTENCE_PROPERTY = "metric-persistency";
     public static final String LOG_PERSISTENCE_PROPERTY = "log-persistency";

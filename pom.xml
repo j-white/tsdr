@@ -260,6 +260,7 @@
     <module>persistence-cassandra</module>
     <module>persistence-hsqldb</module>
     <module>persistence-elasticsearch</module>
+    <module>persistence-memory</module>
     <module>datastorage</module>
     <module>dataquery</module>
     <module>datapurge</module>
